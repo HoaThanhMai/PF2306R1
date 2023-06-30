@@ -27,6 +27,11 @@ d = prompt('d')
 if (c % d == 0) {
   alert('c chia het cho d')
 }
-else {
-  alert('c khong chia het cho d')
-}
+else {alert('c khong chia het cho d')}
+
+document.write('<br/>')
+
+let inputwidth = parseInt(prompt('Enter the width'))
+inputheight = parseInt(prompt('Enter the height'));
+let expectArea = inputwidth * inputheight;
+document.write('Thw area is:' + area);
