@@ -34,4 +34,4 @@ document.write('<br/>')
 let inputwidth = parseInt(prompt('Enter the width'))
 inputheight = parseInt(prompt('Enter the height'));
 let expectArea = inputwidth * inputheight;
-document.write('Thw area is:' + area);
+document.write('The area is:' + area);
