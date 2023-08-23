@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body {
+            margin: 0
+        }
+        h1 {
+            text-align: center;
+        }
+        canvas {
+            background-color: #f0f0f0;
+            display: block;
+            margin: auto;
+            border: solid #dadada;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the bouncing ball game</h1>
+        <canvas id="mainFrame"></canvas>
+    </div>
+    <script>
+        class Ball {
+            constructor(x, y, radius, dx, dy) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.dx = dx;
+                this.dy = dy;
+            }
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, 2*Math.PI);
+                ctx.fillStyle = "#0095DD";
+                ctx.fill();
+                ctx.closePath();
+            }
+
+        }
+        class Paddle {
+            constructor(width, height, x, y, speed) {
+                this.width = width;
+                this.height = height;
+                this.x = x;
+                this.y = y;
+                this.speed = speed;
+            }
+
+            draw(ctx) {
+                ctx.beginPath();
+                ctx.rect(this.x, this.y, this.width, this.height);
+                ctx.fillStyle = "#0095DD";
+                ctx.fill();
+                ctx.closePath();
+            }
+        }
+
+        let canvas =document.getElementById("mainFrame");
+        canvas.width = 500;
+        canvas.height = 500;
+        let ctx = canvas.getContext("2d");
+
+        const initBallX = canvas.width/2;
+        const initBallRadius = 10;
+        const initBallY = 0 + initBallRadius;
+
+        const initPaddleWidth = 90;
+        const initPaddleHeight = 10;
+        const initPaddleX = (canvas.width - initPaddleWidth)/2;
+        const initPaddleY = canvas.height - initPaddleHeight;
+        const initPaddleSpeed = 5;
+
+        let ball = new Ball(initBallX, initBallY, initBallRadius, 1, 1);
+        ball.draw(ctx);
+
+        let paddle = new Paddle(initPaddleWidth, initPaddleHeight, initPaddleX, initPaddleY, initPaddleSpeed);
+        paddle.draw(ctx);
+
+        let rightPressed = false;
+        let leftPressed = false;
+        let gameIsOver = false;
+        let score = 0;
+
+        // Start game reset lại tất cả về ban đầu: vị trí ball, thanh đỡ, status của game, ...
+        function startGame() {
+            // Init lại vị trí ban đầu của quả bóng.
+            ball.x = initBallX;
+            ball.y = initBallY;
+            ball.dx = 3 * Math.random();
+            ball.dy = 3 * Math.random();
+
+            // Init lại vị trí ban đầu của thanh đỡ.
+            paddle.x = initPaddleX;
+            paddle.y = initPaddleY;
+
+            rightPressed = false;
+            leftPressed = false;
+            gameIsOver = false;
+            score = 0;
+
+            draw();
+        }
+
+        // Thêm action điều khiển thanh đỡ của User
+        document.addEventListener("keydown", keyDownHandler);
+        document.addEventListener("keyup", keyUpHandler);
+
+
+        function keyDownHandler(e) {
+            if (e.key === "ArrowRight") {
+                rightPressed = true;
+            } else if (e.key === "ArrowLeft") {
+                leftPressed = true;
+            }
+        }
+
+        function keyUpHandler(e) {
+            if (e.key === "ArrowRight") {
+                rightPressed = false;
+            } else if ( e.key === "ArrowLeft") {
+                leftPressed = false;
+            }
+        }
+
+        function collisionDetection() {
+            if (
+                ball.x >= paddle.x &&
+                ball.x <= paddle.x + paddle.width &&
+                ball.y >= canvas.height - paddle.height - ball.radius
+            ) {
+                const paddleCenterX = paddle.x + paddle.width / 2;
+                const deviation = ball.x - paddleCenterX;
+                ball.dy = - ball.dy;
+                ball.dx = deviation * 0.2;
+                score++;
+            }
+        }
+        function draw() {
+            if (gameIsOver) {
+                alert("Game Over! Score: " + score);
+                startGame();
+                return;
+            }
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            ball.draw(ctx);
+            paddle.draw(ctx);
+
+            collisionDetection();
+
+            // Khi bóng chạm vào khung trò chơi.
+            if (ball.x + ball.dx > canvas.width - ball.radius || ball.x + ball.dx < ball.radius) {
+                ball.dx = -ball.dx;
+            }
+            if (ball.y + ball.dy < ball.radius) {
+                ball.dy = -ball.dy;
+            } else if (ball.y + ball.dy > canvas.height - ball.radius) {
+                // Game over
+                gameIsOver = true;
+            }
+
+            if (rightPressed && paddle.x < canvas.width - paddle.width) {
+                paddle.x += paddle.speed;
+            } else if (leftPressed && paddle.x > 0) {
+                paddle.x -= paddle.speed;
+            }
+
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            requestAnimationFrame(draw);
+        }
+
+        startGame();
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <link
+      rel="stylesheet"
+      href="/case_study/assets/bootstrap-5.3.0-alpha3-dist/css/bootstrap.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="/case_study/assets/fontawesome/css/all.min.css"
+    />
+    <style>
+      body {
+        margin: 0;
+      }
+      h1 {
+        text-align: center;
+      }
+      h5 {
+        text-align: justify;
+      }
+      canvas {
+        background-color: #f0f0f0;
+        border: solid #dadada;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row">
+        <div class="col-12 mt-4 mb-5">
+          <h1>Welcome to the bouncing ball game</h1>
+        </div>
+        <div class="col d-flex justify-content-end p-0">
+          <div class="col-5">
+            <img
+              class="img-fluid h-25 mt-5 ms-3"
+              src="/case_study/assets/image/key.jpg"
+            />
+            <h5 class="mt-5 pt-3">
+              Hãy điều khiển thanh paddle bằng các phím di chuyển trái phải trên bàn phím để bóng không rơi xuống đất và làm biến mất các thanh bricks. Chúc bạn chơi vui vẻ.
+            </h5>
+          </div>
+        </div>
+        <div class="col d-flex justify-content-center p-0">
+          <canvas id="gameCanvas" width="550" height="550"></canvas>
+        </div>
+        <div class="col p-0">
+          <div class="col-4 d-flex flex-column mt-4">
+            <div class="">
+              <h4>High Score: <span id="highScore">0</span></h4>
+            </div>
+            <div class="mt-2 mb-5">
+              <h4>Score: <span id="currentScore">0</span></h4>
+            </div>
+            <button
+              id="btnStart"
+              class="btn btn-outline-secondary border-2 btn-block mt-5"
+            >
+              <h4>Start</h4>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script>
+      // Khai báo class Paddle (thanh đỡ)
+      class Paddle {
+        constructor(width, height, x, y, dx) {
+          this.width = width;
+          this.height = height;
+          this.x = x;
+          this.y = y;
+          this.dx = dx;
+        }
+
+        draw(ctx) {
+          ctx.beginPath();
+          ctx.rect(this.x, this.y, this.width, this.height);
+          ctx.fillStyle = "#0095DD";
+          ctx.fill();
+          ctx.closePath();
+        }
+
+        checkUserControls(leftPress, rightPress, canvas) {
+          if (rightPressed && this.x < canvas.width - this.width) {
+            this.x += this.dx;
+          } else if (leftPressed && this.x > 0) {
+            this.x -= this.dx;
+          }
+        }
+      }
+
+      // Khai báo class Brick
+      class Brick {
+        constructor(width, height, x, y, visibility) {
+          this.width = width;
+          this.height = height;
+          this.x = x;
+          this.y = y;
+          this.visibility = visibility;
+        }
+
+        draw(ctx) {
+          if (this.visibility == true) {
+            ctx.beginPath();
+            ctx.rect(this.x, this.y, this.width, this.height);
+            ctx.fillStyle = "#0095DD";
+            ctx.fill();
+            ctx.closePath();
+          }
+        }
+
+        checkCollisionBall(ball) {
+          if (
+            ball.x >= this.x &&
+            ball.x <= this.x + this.width &&
+            ball.y >= this.y &&
+            ball.y <= this.y + this.height
+          ) {
+            // this.visibility = false;
+          }
+        }
+      }
+
+      // Khai báo class Ball.
+      class Ball {
+        constructor(x, y, radius, dx, dy) {
+          this.x = x;
+          this.y = y;
+          this.radius = radius;
+          this.dx = dx;
+          this.dy = dy;
+        }
+
+        draw(ctx) {
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+          ctx.fillStyle = "#0095DD";
+          ctx.fill();
+          ctx.closePath();
+        }
+
+        // Kiểm tra va chạm thanh đỡ, các cạnh của màn hình game.
+        // return 0 nếu không có va chạm hoặc va chạm vào cạnh trên. trái, phải của màn hình game.
+        // return 1 nếu va chạm vào thanh đỡ.
+        // return 2 nếu chạm vào cạnh dưới của màn hình game.
+        checkCollision(ctx, canvas, paddle, bricks) {
+          let ret = 0;
+
+          // Tính toán lại góc bay của Ball khi chạm các cạnh của màn hình game.
+          // Nếu Ball chạm cạnh dưới, kết thúc game.
+          if (this.y + this.dy > canvas.height - this.radius) {
+            return 2;
+          }
+          // Nếu Ball chạm cạnh trên, góc bay của Ball theo trục Y sẽ ngược lại.
+          if (this.y + this.dy < this.radius) {
+            this.dy = -this.dy;
+          }
+
+          // Nếu Ball chạm cạnh phải và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
+          if (
+            this.x + this.dx > canvas.width - this.radius &&
+            this.y + this.dx > this.radius
+          ) {
+            this.dx = -this.dx;
+          }
+          // Nếu Ball chạm cạnh trái và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
+          if (
+            this.x + this.dx < this.radius &&
+            this.y + this.dx > this.radius
+          ) {
+            this.dx = -this.dx;
+          }
+
+          // Tính toán lại góc bay của Ball khi chạm thanh đỡ
+          if (
+            this.x >= paddle.x &&
+            this.x <= paddle.x + paddle.width &&
+            this.y >= paddle.y - this.radius
+          ) {
+            this.dy = -this.dy;
+            ret = 1;
+          }
+
+          // Tính toán lại góc bay của Ball khi chạm Bricks
+          // Nếu Ball chạm cạnh phải của brick, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
+          if (bricks.visibility == true) {
+            // Tìm điểm gần nhất trên bề mặt của hình chữ nhật đối với hình tròn
+            let distX = Math.abs(this.x + this.dx - (bricks.x + bricks.width/2));
+            let distY = Math.abs(this.y + this.dy - (bricks.y + bricks.height/2));
+            if (distX > bricks.with/2 + this.radius) {
+                // Do nothing
+            }
+
+            if (distY > bricks.height/2 + this.radius) {
+                // Do nothing
+            }
+
+            if (distX <= bricks.with/2 - this.radius) {
+                this.dy = -this.dy;
+            }
+
+            if (distY <= bricks.height/2 - this.radius) {
+                this.dx = -this.dx;
+            }
+        }
+
+          // Thay đổi vị trí Ball bằng toạ độ mới.
+          this.x += this.dx;
+          this.y += this.dy;
+          return ret;
+        }
+      }
+
+      const canvas = document.getElementById("gameCanvas");
+      const ctx = canvas.getContext("2d");
+      const btnStart = document.getElementById("btnStart");
+      const highScoreSpan = document.getElementById("highScore");
+      const currentScoreSpan = document.getElementById("currentScore");
+
+      // Khởi tạo Paddle có width = 75, height = 10 ở vị trí trung tâm cạnh dưới màn hình game.
+      const initPaddleWidth = 100;
+      const initPaddleHeight = 10;
+      const initPaddleY = canvas.height - initPaddleHeight;
+      const initPaddleX = (canvas.width - initPaddleWidth) / 2;
+      const initPaddleDx = 3; // Fixed speed của paddle là 2 theo trục Y.
+
+      // Khởi tạo Ball có bán kính 10 ở vị trí trung tâm màn hình game.
+      const initBallRadius = 10;
+      const initBallX = initPaddleX + initPaddleWidth / 2;
+      const initBallY = initPaddleY - initBallRadius - 1;
+      const initBallSpeedX = 1; // Speed X được set tạm thời, khi start game sẽ được gán lại thành 1 số ngẫu nhiên từ -3 đến 3.
+      const initBallSpeedY = 1; // Speed Y được set tạm thời, khi start game sẽ được gán lại thành 1 số ngẫu nhiên từ 0 đến 3.
+
+      const ball = new Ball(
+        initBallX,
+        initBallY,
+        initBallRadius,
+        initBallSpeedX,
+        initBallSpeedY
+      );
+
+      const paddle = new Paddle(
+        initPaddleWidth,
+        initPaddleHeight,
+        initPaddleX,
+        initPaddleY,
+        initPaddleDx
+      );
+
+      // Khởi tạo biến đánh dấu RightArrow keyboard đang nhấn.
+      // true: RightArrow keyboard được nhấn xuống
+      // false: RightArrow keyboard chưa được nhấn/khi người dùng nhấn xuống và up lên
+      let rightPressed = false;
+
+      // Khởi tạo biến đánh dấu LeftArrow keyboard đang nhấn.
+      // true: LeftArrow keyboard được nhấn xuống
+      // false: LeftArrow keyboard chưa được nhấn/khi người dùng release keyboard.
+      let leftPressed = false;
+
+      // Đăng ký listener khi người dùng nhấn phím.
+      document.addEventListener("keydown", keyDownHandler);
+      document.addEventListener("keyup", keyUpHandler);
+
+      // Check xem User đang nhấn key nào trên keyboard
+      function keyDownHandler(e) {
+        console.log("keydown");
+        if (e.key === "ArrowRight") {
+          rightPressed = true;
+        } else if (e.key === "ArrowLeft") {
+          leftPressed = true;
+        }
+      }
+
+      // Check xem User đang release key nào trên keyboard
+      function keyUpHandler(e) {
+        if (e.key === "ArrowRight") {
+          rightPressed = false;
+        } else if (e.key === "ArrowLeft") {
+          leftPressed = false;
+        }
+      }
+
+      // Khởi tạo điểm của người dùng.
+      let highscore = 0;
+      let currentscore = 0;
+      let gameIsOver = false;
+
+      paddle.draw(ctx);
+      ball.draw(ctx);
+
+      let brick = new Brick(30, 20, 60, 50, true);
+      brick.draw(ctx);
+
+      // createBricks();
+
+      function startGame() {
+        gameIsOver = false;
+        highScoreSpan.textContent = highscore;
+        currentscore = 0;
+        currentScoreSpan.textContent = currentscore;
+
+        // Reset vị trí Ball.
+        ball.x = initBallX;
+        ball.y = initBallY;
+
+        // Khởi tạo ngẫu nhiên tốc độ, góc bay của Ball.
+        ball.dx = 3; //2 * (Math.random() > 0.5 ? 1 : -1);
+        ball.dy = -2;
+
+        // Reset vị trí Paddle.
+        paddle.x = initPaddleX;
+        paddle.y = initPaddleY;
+
+        // Reset keyboard events.
+        rightPressed = false;
+        leftPressed = false;
+
+        brick.visibility = true;
+
+        draw();
+      }
+
+      function draw() {
+        if (gameIsOver) {
+          //   alert("Game Over! Score: " + currentscore);
+          if (highscore < currentscore) {
+            highscore = currentscore;
+            highScoreSpan.textContent = highscore;
+          }
+          //   startGame();
+          return;
+        }
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        ball.draw(ctx);
+        paddle.draw(ctx);
+        brick.draw(ctx);
+
+        // Kiểm tra Ball có chạm thanh đỡ hoặc cạnh dưới của màn hình game không.
+        let collisionResult = ball.checkCollision(ctx, canvas, paddle, brick);
+        brick.checkCollisionBall(ball);
+
+        // Nếu Ball chạm cạnh dưới của thanh đỡ, kết thúc game.
+        gameIsOver = collisionResult == 2;
+
+        // Nếu Ball chạm thanh đỡ, tăng score lên 1.
+        if (collisionResult == 1) {
+          currentscore += 1;
+          currentScoreSpan.textContent = currentscore;
+        }
+
+        // Tính toán lại toạ độ thanh đỡ theo điều khiển người dùng.
+        paddle.checkUserControls(leftPressed, rightPressed, canvas);
+
+        // Dùng requestAnimationFrame() để vẽ tiếp chuyển động của Ball và thanh đỡ
+        // để tối ưu animation.
+        requestAnimationFrame(draw);
+      }
+
+      // Khi người dùng click vào button Start, thì thực hiện hàm startGame.
+      btnStart.addEventListener("click", startGame);
+    </script>
+  </body>
+</html>
