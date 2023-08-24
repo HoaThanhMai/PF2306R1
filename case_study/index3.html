@@ -6,12 +6,9 @@
     <title>Document</title>
     <link
       rel="stylesheet"
-      href="/case_study/assets/bootstrap-5.3.0-alpha3-dist/css/bootstrap.min.css"
+      href="assets/bootstrap-5.3.0-alpha3-dist/css/bootstrap.min.css"
     />
-    <link
-      rel="stylesheet"
-      href="/case_study/assets/fontawesome/css/all.min.css"
-    />
+    <link rel="stylesheet" href="assets/fontawesome/css/all.min.css" />
     <style>
       body {
         margin: 0;
@@ -32,24 +29,23 @@
     <div class="container-fluid">
       <div class="row">
         <div class="col-12 mt-4 mb-5">
-          <h1>Welcome to the bouncing ball game</h1>
+          <h1>Bouncing ball game</h1>
         </div>
         <div class="col d-flex justify-content-end p-0">
           <div class="col-5">
-            <img
-              class="img-fluid h-25 mt-5 ms-3"
-              src="/case_study/assets/image/key.jpg"
-            />
-            <h5 class="mt-5 pt-3">
-              Hãy điều khiển thanh paddle bằng các phím di chuyển trái phải trên bàn phím để bóng không rơi xuống đất và làm biến mất các thanh bricks. Chúc bạn chơi vui vẻ.
+            <img class="img-fluid h-25 mt-3 ms-3" src="assets/image/key.jpg" />
+            <h5 class="mt-3 pt-3">
+              Hãy điều khiển thanh paddle bằng các phím di chuyển trái phải trên
+              bàn phím để bóng không rơi xuống đất và làm biến mất các thanh
+              bricks. Chúc bạn chơi vui vẻ.
             </h5>
           </div>
         </div>
         <div class="col d-flex justify-content-center p-0">
-          <canvas id="gameCanvas" width="550" height="550"></canvas>
+          <canvas id="gameCanvas" width="400" height="400"></canvas>
         </div>
         <div class="col p-0">
-          <div class="col-4 d-flex flex-column mt-4">
+          <div class="col-4 d-flex flex-column mt-3">
             <div class="">
               <h4>High Score: <span id="highScore">0</span></h4>
             </div>
@@ -58,7 +54,7 @@
             </div>
             <button
               id="btnStart"
-              class="btn btn-outline-secondary border-2 btn-block mt-5"
+              class="btn btn-outline-secondary border-2 btn-block mt-3"
             >
               <h4>Start</h4>
             </button>
@@ -67,22 +63,52 @@
       </div>
     </div>
     <script>
-      // Khai báo class Paddle (thanh đỡ)
-      class Paddle {
-        constructor(width, height, x, y, dx) {
+      // Tạo class base Rectangle cho thanh đỡ, bricks, game result.
+      class Rectangle {
+        constructor(width, height, x, y) {
           this.width = width;
           this.height = height;
           this.x = x;
           this.y = y;
-          this.dx = dx;
+        }
+        draw(ctx) {
+          ctx.beginPath();
+          ctx.rect(this.x, this.y, this.width, this.height);
+          ctx.fillStyle = "black";
+          ctx.fill();
+          ctx.closePath();
+        }
+      }
+
+      // GameResult kế thừa class Rectangle.
+      class GameResult extends Rectangle {
+        constructor(width, height, x, y, visible, text) {
+          super(width, height, x, y);
+          this.visible = visible;
+          this.text = text;
         }
 
         draw(ctx) {
           ctx.beginPath();
           ctx.rect(this.x, this.y, this.width, this.height);
-          ctx.fillStyle = "#0095DD";
+          ctx.fillStyle = "gray";
           ctx.fill();
           ctx.closePath();
+
+          ctx.font = "28px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillStyle = "black";
+
+          ctx.fillText(this.text, this.width / 2, this.height / 2);
+        }
+      }
+
+      // Khai báo class Paddle (thanh đỡ)
+      class Paddle extends Rectangle {
+        constructor(width, height, x, y, dx) {
+          super(width, height, x, x);
+          this.dx = dx;
         }
 
         checkUserControls(leftPress, rightPress, canvas) {
@@ -95,12 +121,9 @@
       }
 
       // Khai báo class Brick
-      class Brick {
+      class Brick extends Rectangle {
         constructor(width, height, x, y, visibility) {
-          this.width = width;
-          this.height = height;
-          this.x = x;
-          this.y = y;
+          super(width, height, x, y);
           this.visibility = visibility;
         }
 
@@ -108,23 +131,18 @@
           if (this.visibility == true) {
             ctx.beginPath();
             ctx.rect(this.x, this.y, this.width, this.height);
-            ctx.fillStyle = "#0095DD";
+            ctx.fillStyle = "brown";
             ctx.fill();
             ctx.closePath();
           }
         }
-
-        checkCollisionBall(ball) {
-          if (
-            ball.x >= this.x &&
-            ball.x <= this.x + this.width &&
-            ball.y >= this.y &&
-            ball.y <= this.y + this.height
-          ) {
-            // this.visibility = false;
-          }
-        }
       }
+
+      // Khai báo hằng cho class Ball
+      const BALL_COLLISION_CANVAS_BOTTOM = -1;
+      const BALL_COLLISION_RECT_NON = 0;
+      const BALL_COLLISION_PADDLE = 1;
+      const BALL_COLLISION_BRICK = 2;
 
       // Khai báo class Ball.
       class Ball {
@@ -134,84 +152,168 @@
           this.radius = radius;
           this.dx = dx;
           this.dy = dy;
+          this.optimizeDx = false;
+          this.optimizeDy = false;
+          this.dxOptimized = 0;
+          this.dyOptimized = 0;
         }
 
         draw(ctx) {
           ctx.beginPath();
           ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-          ctx.fillStyle = "#0095DD";
+          ctx.fillStyle = "#FFA500";
           ctx.fill();
           ctx.closePath();
         }
 
-        // Kiểm tra va chạm thanh đỡ, các cạnh của màn hình game.
-        // return 0 nếu không có va chạm hoặc va chạm vào cạnh trên. trái, phải của màn hình game.
-        // return 1 nếu va chạm vào thanh đỡ.
-        // return 2 nếu chạm vào cạnh dưới của màn hình game.
-        checkCollision(ctx, canvas, paddle, bricks) {
-          let ret = 0;
+        // Kiểm tra collisions với Các cạnh của màn hình game và tính toán lại góc bay.
+        // Cần optimize lại góc, tốc độ bay khi khoảng cách giữa Ball và biên nhỏ hơn tốc độ bay.
+        // Để Ball vừa chạm đến biên.
+        checkCollisionWithCanvas(canvas1) {
+          let ret = BALL_COLLISION_RECT_NON;
 
-          // Tính toán lại góc bay của Ball khi chạm các cạnh của màn hình game.
           // Nếu Ball chạm cạnh dưới, kết thúc game.
-          if (this.y + this.dy > canvas.height - this.radius) {
-            return 2;
+          if (this.dy > 0 && this.y >= canvas1.height - this.radius) {
+            return BALL_COLLISION_CANVAS_BOTTOM;
+          } else if (
+            this.dy > 0 &&
+            this.y + this.dy > canvas1.height - this.radius
+          ) {
+            this.optimizeDy = true;
+            this.dyOptimized = canvas1.height - this.radius - this.y;
           }
+
           // Nếu Ball chạm cạnh trên, góc bay của Ball theo trục Y sẽ ngược lại.
-          if (this.y + this.dy < this.radius) {
+          if (this.dy < 0 && this.y <= this.radius) {
             this.dy = -this.dy;
+          } else if (this.dy < 0 && this.y + this.dy < this.radius) {
+            this.optimizeDy = true;
+            this.dyOptimized = this.radius - this.y;
           }
 
           // Nếu Ball chạm cạnh phải và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
-          if (
-            this.x + this.dx > canvas.width - this.radius &&
-            this.y + this.dx > this.radius
-          ) {
+          if (this.dx > 0 && this.x >= canvas1.width - this.radius) {
             this.dx = -this.dx;
+          } else if (
+            this.dx > 0 &&
+            this.x + this.dx > canvas1.width - this.radius
+          ) {
+            this.optimizeDx = true;
+            this.dxOptimized = canvas1.width - this.radius - this.x;
           }
+
           // Nếu Ball chạm cạnh trái và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
-          if (
-            this.x + this.dx < this.radius &&
-            this.y + this.dx > this.radius
-          ) {
+          if (this.dx < 0 && this.x <= this.radius) {
             this.dx = -this.dx;
+          } else if (this.dx < 0 && this.x + this.dx < this.radius) {
+            this.optimizeDx = true;
+            this.dxOptimized = this.radius - this.x;
           }
 
-          // Tính toán lại góc bay của Ball khi chạm thanh đỡ
-          if (
-            this.x >= paddle.x &&
-            this.x <= paddle.x + paddle.width &&
-            this.y >= paddle.y - this.radius
-          ) {
-            this.dy = -this.dy;
-            ret = 1;
-          }
-
-          // Tính toán lại góc bay của Ball khi chạm Bricks
-          // Nếu Ball chạm cạnh phải của brick, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
-          if (bricks.visibility == true) {
-            // Tìm điểm gần nhất trên bề mặt của hình chữ nhật đối với hình tròn
-            let distX = Math.abs(this.x + this.dx - (bricks.x + bricks.width/2));
-            let distY = Math.abs(this.y + this.dy - (bricks.y + bricks.height/2));
-            if (distX > bricks.with/2 + this.radius) {
-                // Do nothing
-            }
-
-            if (distY > bricks.height/2 + this.radius) {
-                // Do nothing
-            }
-
-            if (distX <= bricks.with/2 - this.radius) {
-                this.dy = -this.dy;
-            }
-
-            if (distY <= bricks.height/2 - this.radius) {
-                this.dx = -this.dx;
-            }
+          return ret;
         }
 
+        // Kiểm tra collisions với cạnh trên của thanh đỡ và tính lại góc bay.
+        checkCollisionWithPaddle(paddle1) {
+          let ret = BALL_COLLISION_RECT_NON;
+
+          let Ax = this.x;
+          let Ay = this.y;
+          let rect_left = paddle1.x;
+          let rect_top = paddle1.y;
+          let rect_right = paddle1.x + paddle1.width;
+          let rect_bottom = paddle1.y + paddle1.height;
+
+          if (this.x < rect_left) Ax = rect_left;
+          else if (this.x > rect_right) Ax = rect_right;
+
+          if (this.y < rect_top) Ay = rect_top;
+          else if (this.y > rect_bottom) Ay = rect_bottom;
+
+          let dx = this.x - Ax;
+          let dy = this.y - Ay;
+
+          if (dx * dx + dy * dy < this.radius * this.radius) {
+            ret = BALL_COLLISION_PADDLE;
+            if (this.x >= rect_left && this.x <= rect_right) {
+              this.dy = -this.dy;
+            } else {
+              this.dx = -this.dx;
+            }
+          }
+
+          return ret;
+        }
+
+        // Kiểm tra collisions với các cạnh của bricks và tính toán lại góc bay.
+        checkCollisionWithBricks(bricks1) {
+          let ret = BALL_COLLISION_RECT_NON;
+
+          // Nếu Ball chạm cạnh phải của brick, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
+          if (bricks1.visibility == true) {
+            let Ax = this.x;
+            let Ay = this.y;
+            let rect_left = bricks1.x;
+            let rect_top = bricks1.y;
+            let rect_right = bricks1.x + bricks1.width;
+            let rect_bottom = bricks1.y + bricks1.height;
+
+            if (this.x < rect_left) Ax = rect_left;
+            else if (this.x > rect_right) Ax = rect_right;
+
+            if (this.y < rect_top) Ay = rect_top;
+            else if (this.y > rect_bottom) Ay = rect_bottom;
+
+            let dx = this.x - Ax;
+            let dy = this.y - Ay;
+
+            if (dx * dx + dy * dy < this.radius * this.radius) {
+              ret = BALL_COLLISION_BRICK;
+              bricks1.visibility = false;
+              if (this.x >= rect_left && this.x <= rect_right) {
+                this.dy = -this.dy;
+              } else {
+                this.dx = -this.dx;
+              }
+            }
+          }
+
+          return ret;
+        }
+
+        // Kiểm tra va chạm Ball với thanh đỡ, cạnh màn hình game.
+        checkCollision(canvas1, paddle1) {
+          let ret = 0;
+
+          this.optimizeDx = false;
+          this.optimizeDy = false;
+          this.dxOptimized = 0;
+          this.dxOptimized = 0;
+
+          ret = this.checkCollisionWithCanvas(canvas1);
+
+          if (ret == BALL_COLLISION_CANVAS_BOTTOM) {
+            this.optimizeDx = false;
+            this.optimizeDy = false;
+            this.dxOptimized = 0;
+            this.dxOptimized = 0;
+            return ret;
+          }
+
+          ret = this.checkCollisionWithPaddle(paddle1);
+
           // Thay đổi vị trí Ball bằng toạ độ mới.
-          this.x += this.dx;
-          this.y += this.dy;
+          if (this.optimizeDy) {
+            this.y += this.dyOptimized;
+          } else {
+            this.y += this.dy;
+          }
+
+          if (this.optimizeDx) {
+            this.x += this.dxOptimized;
+          } else {
+            this.x += this.dx;
+          }
           return ret;
         }
       }
@@ -221,6 +323,21 @@
       const btnStart = document.getElementById("btnStart");
       const highScoreSpan = document.getElementById("highScore");
       const currentScoreSpan = document.getElementById("currentScore");
+
+      const gameResult = new GameResult(
+        canvas.width,
+        canvas.height,
+        0,
+        0,
+        false,
+        ""
+      );
+
+      const ballCollisionWithPaddleSound = new Audio(
+        "assets/sound/ball_collision_paddle.mp3"
+      );
+      const gameIsOverSound = new Audio("assets/sound/game_is_over.mp3");
+      const youWinSound = new Audio("assets/sound/you_win.mp3");
 
       // Khởi tạo Paddle có width = 75, height = 10 ở vị trí trung tâm cạnh dưới màn hình game.
       const initPaddleWidth = 100;
@@ -243,6 +360,7 @@
         initBallSpeedX,
         initBallSpeedY
       );
+      ball.draw(ctx);
 
       const paddle = new Paddle(
         initPaddleWidth,
@@ -251,6 +369,8 @@
         initPaddleY,
         initPaddleDx
       );
+
+      paddle.draw(ctx);
 
       // Khởi tạo biến đánh dấu RightArrow keyboard đang nhấn.
       // true: RightArrow keyboard được nhấn xuống
@@ -263,11 +383,11 @@
       let leftPressed = false;
 
       // Đăng ký listener khi người dùng nhấn phím.
-      document.addEventListener("keydown", keyDownHandler);
-      document.addEventListener("keyup", keyUpHandler);
+      document.addEventListener("keydown", onKeyDown);
+      document.addEventListener("keyup", onKeyUp);
 
       // Check xem User đang nhấn key nào trên keyboard
-      function keyDownHandler(e) {
+      function onKeyDown(e) {
         console.log("keydown");
         if (e.key === "ArrowRight") {
           rightPressed = true;
@@ -277,7 +397,7 @@
       }
 
       // Check xem User đang release key nào trên keyboard
-      function keyUpHandler(e) {
+      function onKeyUp(e) {
         if (e.key === "ArrowRight") {
           rightPressed = false;
         } else if (e.key === "ArrowLeft") {
@@ -289,20 +409,31 @@
       let highscore = 0;
       let currentscore = 0;
       let gameIsOver = false;
+      let allBricksIsBreaked = false;
 
-      paddle.draw(ctx);
-      ball.draw(ctx);
+      let bricksArr = [];
 
-      let brick = new Brick(30, 20, 60, 50, true);
-      brick.draw(ctx);
-
-      // createBricks();
+      // Tạo random tối đa 10 bricks ở nửa trên màn hình game.
+      function createBricks() {
+        const bricksCount = 10;
+        const brickWidth = 40;
+        const brickHeight = 20;
+        let bricksArr = [];
+        for (let i = 0; i < bricksCount; i++) {
+          let x = Math.floor(Math.random() * 340);
+          let y = Math.floor(Math.random() * 150);
+          bricksArr.push(new Brick(brickWidth, brickHeight, x, y, true));
+        }
+        return bricksArr;
+      }
 
       function startGame() {
         gameIsOver = false;
+        allBricksIsBreaked = false;
         highScoreSpan.textContent = highscore;
         currentscore = 0;
         currentScoreSpan.textContent = currentscore;
+        gameResult.visibility = false;
 
         // Reset vị trí Ball.
         ball.x = initBallX;
@@ -320,19 +451,28 @@
         rightPressed = false;
         leftPressed = false;
 
-        brick.visibility = true;
+        bricksArr = createBricks();
 
         draw();
       }
 
+      // Draw các components, kiểm tra điều kiện kết thúc game, play sound, thông báo.
       function draw() {
-        if (gameIsOver) {
-          //   alert("Game Over! Score: " + currentscore);
+        if (gameIsOver || allBricksIsBreaked) {
           if (highscore < currentscore) {
             highscore = currentscore;
             highScoreSpan.textContent = highscore;
           }
-          //   startGame();
+          if (gameIsOver) {
+            gameIsOverSound.play();
+            gameResult.text = "GAME OVER!";
+          } else {
+            youWinSound.play();
+            gameResult.text = "YOU WIN!";
+          }
+
+          gameResult.visibility = true;
+          gameResult.draw(ctx);
           return;
         }
 
@@ -340,19 +480,35 @@
 
         ball.draw(ctx);
         paddle.draw(ctx);
-        brick.draw(ctx);
+
+        allBricksIsBreaked = true;
+
+        // For loop để vẽ tất cả các bricks.
+        for (const element of bricksArr) {
+          element.draw(ctx);
+          if (element.visibility == true) {
+            // Nếu kiểm tra thấy brick vẫn được hiển thị, người dùng chưa win.
+            allBricksIsBreaked = false;
+          }
+        }
 
         // Kiểm tra Ball có chạm thanh đỡ hoặc cạnh dưới của màn hình game không.
-        let collisionResult = ball.checkCollision(ctx, canvas, paddle, brick);
-        brick.checkCollisionBall(ball);
+        let collisionResult = ball.checkCollision(canvas, paddle);
 
-        // Nếu Ball chạm cạnh dưới của thanh đỡ, kết thúc game.
-        gameIsOver = collisionResult == 2;
+        // For loop để vẽ kiểm tra collision của Ball và lần lượt các bricks.
+        for (const element of bricksArr) {
+          let collisionResultBricks = ball.checkCollisionWithBricks(element);
+          if (collisionResultBricks == BALL_COLLISION_BRICK) {
+            ballCollisionWithPaddleSound.play();
+            currentscore += 1;
+            currentScoreSpan.textContent = currentscore;
+          }
+        }
 
-        // Nếu Ball chạm thanh đỡ, tăng score lên 1.
-        if (collisionResult == 1) {
-          currentscore += 1;
-          currentScoreSpan.textContent = currentscore;
+        if (collisionResult == BALL_COLLISION_PADDLE) {
+          ballCollisionWithPaddleSound.play();
+        } else if (collisionResult == BALL_COLLISION_CANVAS_BOTTOM) {
+          gameIsOver = true;
         }
 
         // Tính toán lại toạ độ thanh đỡ theo điều khiển người dùng.
