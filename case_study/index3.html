@@ -143,15 +143,28 @@
       const BALL_COLLISION_RECT_NON = 0;
       const BALL_COLLISION_PADDLE = 1;
       const BALL_COLLISION_BRICK = 2;
+      const BALL_COLLISION_CANVAS = 3;
 
       // Khai báo class Ball.
       class Ball {
-        constructor(x, y, radius, dx, dy) {
+        constructor(
+          x,
+          y,
+          radius,
+          dx,
+          dy,
+          canvasSound,
+          paddleSound,
+          brickSound
+        ) {
           this.x = x;
           this.y = y;
           this.radius = radius;
           this.dx = dx;
           this.dy = dy;
+          this.canvasSound = canvasSound;
+          this.paddleSound = paddleSound;
+          this.brickSound = brickSound;
           this.optimizeDx = false;
           this.optimizeDy = false;
           this.dxOptimized = 0;
@@ -185,6 +198,7 @@
 
           // Nếu Ball chạm cạnh trên, góc bay của Ball theo trục Y sẽ ngược lại.
           if (this.dy < 0 && this.y <= this.radius) {
+            ret = BALL_COLLISION_CANVAS;
             this.dy = -this.dy;
           } else if (this.dy < 0 && this.y + this.dy < this.radius) {
             this.optimizeDy = true;
@@ -193,6 +207,7 @@
 
           // Nếu Ball chạm cạnh phải và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
           if (this.dx > 0 && this.x >= canvas1.width - this.radius) {
+            ret = BALL_COLLISION_CANVAS;
             this.dx = -this.dx;
           } else if (
             this.dx > 0 &&
@@ -204,10 +219,15 @@
 
           // Nếu Ball chạm cạnh trái và chưa chạm cạnh dưới, góc bay của Ball theo trục X sẽ ngược lại với hướng hiện tại.
           if (this.dx < 0 && this.x <= this.radius) {
+            ret = BALL_COLLISION_CANVAS;
             this.dx = -this.dx;
           } else if (this.dx < 0 && this.x + this.dx < this.radius) {
             this.optimizeDx = true;
             this.dxOptimized = this.radius - this.x;
+          }
+
+          if (ret == BALL_COLLISION_CANVAS) {
+            playSound(this.canvasSound, 0);
           }
 
           return ret;
@@ -240,6 +260,10 @@
             } else {
               this.dx = -this.dx;
             }
+          }
+
+          if (ret == BALL_COLLISION_PADDLE) {
+            playSound(this.paddleSound, 0.2);
           }
 
           return ret;
@@ -276,6 +300,10 @@
                 this.dx = -this.dx;
               }
             }
+          }
+
+          if (ret == BALL_COLLISION_BRICK) {
+            playSound(this.brickSound, 0.5);
           }
 
           return ret;
@@ -318,6 +346,18 @@
         }
       }
 
+      function playSound(audio, currentTime) {
+        // Kiểm tra nếu âm thanh đang phát, thì dừng nó
+        if (!audio.paused) {
+          audio.pause();
+        }
+
+        audio.currentTime = currentTime;
+
+        // Chơi âm thanh
+        audio.play();
+      }
+
       const canvas = document.getElementById("gameCanvas");
       const ctx = canvas.getContext("2d");
       const btnStart = document.getElementById("btnStart");
@@ -334,10 +374,19 @@
       );
 
       const ballCollisionWithPaddleSound = new Audio(
-        "assets/sound/ball_collision_paddle.mp3"
+        "assets/sound/collision_paddle.mp3"
       );
-      const gameIsOverSound = new Audio("assets/sound/game_is_over.mp3");
-      const youWinSound = new Audio("assets/sound/you_win.mp3");
+
+      const ballCollisionWithBricksSound = new Audio(
+        "assets/sound/collision_bricks.mp3"
+      );
+
+      const ballCollisionWithCanvasSound = new Audio(
+        "assets/sound/collision_canvas.mp3"
+      );
+
+      const gameIsOverSound = new Audio("assets/sound/game_over.mp3");
+      const winSound = new Audio("assets/sound/win.mp3");
 
       // Khởi tạo Paddle có width = 75, height = 10 ở vị trí trung tâm cạnh dưới màn hình game.
       const initPaddleWidth = 100;
@@ -358,7 +407,10 @@
         initBallY,
         initBallRadius,
         initBallSpeedX,
-        initBallSpeedY
+        initBallSpeedY,
+        ballCollisionWithCanvasSound,
+        ballCollisionWithPaddleSound,
+        ballCollisionWithBricksSound
       );
       ball.draw(ctx);
 
@@ -413,9 +465,8 @@
 
       let bricksArr = [];
 
-      // Tạo random tối đa 10 bricks ở nửa trên màn hình game.
-      function createBricks() {
-        const bricksCount = 10;
+      // Tạo random bricks ở nửa trên màn hình game.
+      function createBricks(bricksCount) {
         const brickWidth = 40;
         const brickHeight = 20;
         let bricksArr = [];
@@ -451,7 +502,8 @@
         rightPressed = false;
         leftPressed = false;
 
-        bricksArr = createBricks();
+        const bricksCount = 20;
+        bricksArr = createBricks(bricksCount);
 
         draw();
       }
@@ -464,10 +516,10 @@
             highScoreSpan.textContent = highscore;
           }
           if (gameIsOver) {
-            gameIsOverSound.play();
+            playSound(gameIsOverSound, 0);
             gameResult.text = "GAME OVER!";
           } else {
-            youWinSound.play();
+            playSound(winSound, 0);
             gameResult.text = "YOU WIN!";
           }
 
@@ -499,15 +551,12 @@
         for (const element of bricksArr) {
           let collisionResultBricks = ball.checkCollisionWithBricks(element);
           if (collisionResultBricks == BALL_COLLISION_BRICK) {
-            ballCollisionWithPaddleSound.play();
             currentscore += 1;
             currentScoreSpan.textContent = currentscore;
           }
         }
 
-        if (collisionResult == BALL_COLLISION_PADDLE) {
-          ballCollisionWithPaddleSound.play();
-        } else if (collisionResult == BALL_COLLISION_CANVAS_BOTTOM) {
+        if (collisionResult == BALL_COLLISION_CANVAS_BOTTOM) {
           gameIsOver = true;
         }
 
